@@ -1,0 +1,25 @@
+AddOptionMenu "OptionsMenu"
+{
+	Submenu "Motion Blur", "MotionBlur"
+}
+
+OptionMenu "MotionBlur"
+{
+	Position -15
+	Title "Motion Blur"
+	Option "Enabled", "r_motionblur", YesNo
+	Option "Blend Mode", "r_motionblur_blendmode", "MotionBlurBlendModes"
+	StaticText ""
+	Slider "Samples", "r_motionblur_samples", 1, 100, 1, 0
+	option "Dynamic", "r_motionblur_dynsamps", YesNo
+	StaticText ""
+	Slider "Look Strength", "r_motionblur_strength_look", 0, 100, 1, 0
+	Slider "Move Strength", "r_motionblur_strength_move", 0, 100, 1, 0
+	Slider "Strafe Strength", "r_motionblur_strength_strafe", 0, 100, 1, 0
+}
+
+OptionValue "MotionBlurBlendModes"
+{
+	0, "Normal"
+	1, "Lighten"
+}

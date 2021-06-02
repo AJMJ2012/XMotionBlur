@@ -1,0 +1,94 @@
+version "2.4"
+
+class MotionBlurHandler : StaticEventHandler {
+	bool debug;
+	vector3 travel;
+	vector2 view;
+	
+	override void PlayerEntered(PlayerEvent e) {
+		PlayerInfo plr = players[e.PlayerNumber];
+		if (plr) {
+			travel = (0,0,0);
+		}
+	}
+	
+	override void WorldTick() {
+		PlayerInfo plr = players[consoleplayer];
+		if (plr && plr.health > 0 && Cvar.GetCVar("r_motionblur", plr).GetBool()) {
+			view.x = plr.mo.GetPlayerInput(ModInput_Yaw);
+			view.y = -plr.mo.GetPlayerInput(ModInput_Pitch);
+		}
+		else {
+			travel = (0,0,0);
+		}
+	}
+	
+	override void NetworkProcess(ConsoleEvent e) {
+		PlayerInfo plr = players[e.Player];
+		if (plr && e.Name == "liveupdate") {
+			travel = (0,0,0);
+			double angle = atan2(plr.mo.vel.y, plr.mo.vel.x) - ((plr.mo.angle) % 360);
+			vector3 velocity = ((-sin(angle), cos(angle)) * sqrt(plr.mo.vel.x * plr.mo.vel.x + plr.mo.vel.y * plr.mo.vel.y), plr.mo.vel.z);
+			
+			double pitch = sin(plr.mo.pitch);
+			
+			// Shift pixels based on the distance travelled or turned from the previous frame. Without depth information, movement is inaccurate.
+			double amount_look    = Cvar.GetCVar("r_motionblur_strength_look", plr).GetFloat()   / 100 / 12800;
+			double amount_move_z  = Cvar.GetCVar("r_motionblur_strength_move", plr).GetFloat()   / 100 / 100; // 400;
+			double amount_move_xy = Cvar.GetCVar("r_motionblur_strength_strafe", plr).GetFloat() / 100 / 400; // 1600;
+			
+			// Looking Around
+			travel.x -= view.x * amount_look * (1.0 - abs(pitch));
+			travel.y -= view.y * amount_look;
+			
+			// Moving Left/Right/Up/Down
+			travel.x += velocity.x * amount_move_xy;
+			travel.y += velocity.y * amount_move_xy * pitch;
+			travel.y += velocity.z * amount_move_xy * (1.0 - abs(pitch));
+			
+			// Moving Forward/Back
+			travel.z += velocity.y * amount_move_z * (1.0 - abs(pitch));
+			travel.z -= velocity.z * amount_move_z * pitch;
+			if (debug) {
+				console.printf( "----------------" );
+				console.printf( "A: %f", angle );
+				console.printf( "P: %f", pitch );
+				console.printf( "X: %f", travel.x );
+				console.printf( "Y: %f", travel.y );
+				console.printf( "Z: %f", travel.z );
+			}
+		}
+	}
+	
+	override void UiTick() {
+		PlayerInfo	plr = players[consoleplayer];
+		if (plr) {
+			if (plr.health > 0 && Cvar.GetCVar("r_motionblur", plr).GetBool()) {
+				EventHandler.SendNetworkEvent("liveupdate");
+				vector3 shift = travel;
+				if (shift.x == 0 && shift.y == 0 && shift.z == 0) {
+					Shader.SetEnabled(plr, "MotionBlur", false);
+					return;
+				}
+				else {
+					int samples = 1;
+					if (Cvar.GetCVar("r_motionblur_dynsamps", plr).GetBool())
+						samples += ceil(sqrt(shift.x * shift.x + shift.y * shift.y + shift.z * shift.z) * int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt()) * 10);
+					else
+						samples += int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt());
+					
+					if (debug)
+						console.printf( "S: %f", samples );
+					
+					Shader.SetUniform3f(plr, "MotionBlur", "shift", shift / samples);
+					Shader.SetUniform1i(plr, "MotionBlur", "samples", samples);
+					Shader.SetUniform1i(plr, "MotionBlur", "blendMode", Cvar.GetCVar("r_motionblur_blendmode", plr).GetInt());
+					Shader.SetEnabled(plr, "MotionBlur", true);
+				}
+			}
+			else {
+				Shader.SetEnabled(plr, "MotionBlur", false);
+			}
+		}
+	}
+}
