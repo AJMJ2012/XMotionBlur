@@ -1,10 +1,8 @@
-AddOptionMenu "OptionsMenu"
-{
+AddOptionMenu "OptionsMenu" {
 	Submenu "Motion Blur", "MotionBlur"
 }
 
-OptionMenu "MotionBlur"
-{
+OptionMenu "MotionBlur" {
 	Position -15
 	Title "Motion Blur"
 	Option "Enabled", "r_motionblur", YesNo
@@ -18,8 +16,7 @@ OptionMenu "MotionBlur"
 	Slider "Strafe Strength", "r_motionblur_strength_strafe", 0, 100, 1, 0
 }
 
-OptionValue "MotionBlurBlendModes"
-{
+OptionValue "MotionBlurBlendModes" {
 	0, "Normal"
 	1, "Lighten"
 }

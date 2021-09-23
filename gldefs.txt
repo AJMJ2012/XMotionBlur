@@ -1,5 +1,4 @@
-HardwareShader PostProcess BeforeBloom
-{
+HardwareShader PostProcess BeforeBloom {
 	Name "MotionBlur"
 	Shader "shaders/mblur.fp" 330
 	Uniform vec3 shift
