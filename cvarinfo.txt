@@ -1,7 +1,7 @@
 user bool r_motionblur = false;
-user int r_motionblur_samples = 50;
-user float r_motionblur_strength_look = 10;
-user float r_motionblur_strength_move = 10;
-user float r_motionblur_strength_strafe = 10;
+user int r_motionblur_samples = 32;
+user float r_motionblur_strength_look = 25;
+user float r_motionblur_strength_move = 25;
+user float r_motionblur_strength_strafe = 25;
 user int r_motionblur_blendmode = 1;
 user bool r_motionblur_dynsamps = true;

@@ -1,5 +1,7 @@
 version "2.4"
 
+// TODO: Somehow make it run faster than 35 frames per second.
+
 class MotionBlurHandler : StaticEventHandler {
 	bool debug;
 	vector3 travel;
@@ -25,30 +27,31 @@ class MotionBlurHandler : StaticEventHandler {
 	
 	override void NetworkProcess(ConsoleEvent e) {
 		PlayerInfo plr = players[e.Player];
-		if (plr && e.Name == "liveupdate") {
+		if (plr && e.Name == "updatemotionblur") {
 			travel = (0,0,0);
 			double angle = atan2(plr.mo.vel.y, plr.mo.vel.x) - ((plr.mo.angle) % 360);
 			vector3 velocity = ((-sin(angle), cos(angle)) * sqrt(plr.mo.vel.x * plr.mo.vel.x + plr.mo.vel.y * plr.mo.vel.y), plr.mo.vel.z);
 			
 			double pitch = sin(plr.mo.pitch);
 			
-			// Shift pixels based on the distance travelled or turned from the previous frame. Without depth information, movement is inaccurate.
-			double amount_look    = Cvar.GetCVar("r_motionblur_strength_look", plr).GetFloat()   / 100 / 12800;
-			double amount_move_z  = Cvar.GetCVar("r_motionblur_strength_move", plr).GetFloat()   / 100 / 100; // 400;
-			double amount_move_xy = Cvar.GetCVar("r_motionblur_strength_strafe", plr).GetFloat() / 100 / 400; // 1600;
+			// Shift pixels based on the distance travelled or turned from the previous frame.
+			double amount_look    = Cvar.GetCVar("r_motionblur_strength_look", plr).GetFloat()   / 100 / 25600;
+			// THESE BELOW NEED DEPTH BASED BLUR BUT THAT IS IMPOSSIBLE RIGHT NOW!
+			double amount_move_z  = Cvar.GetCVar("r_motionblur_strength_move", plr).GetFloat()   / 100 / 64; // Focal Distance
+			double amount_move_xy = Cvar.GetCVar("r_motionblur_strength_strafe", plr).GetFloat() / 100 / 512; // Focal Distance
 			
 			// Looking Around
-			travel.x -= view.x * amount_look * (1.0 - abs(pitch));
-			travel.y -= view.y * amount_look;
+			travel.x += view.x * amount_look * (1.0 - abs(pitch));
+			travel.y += view.y * amount_look;
 			
 			// Moving Left/Right/Up/Down
-			travel.x += velocity.x * amount_move_xy;
-			travel.y += velocity.y * amount_move_xy * pitch;
-			travel.y += velocity.z * amount_move_xy * (1.0 - abs(pitch));
+			travel.x -= velocity.x * amount_move_xy;
+			travel.y -= velocity.y * amount_move_xy * pitch;
+			travel.y -= velocity.z * amount_move_xy * (1.0 - abs(pitch));
 			
 			// Moving Forward/Back
-			travel.z += velocity.y * amount_move_z * (1.0 - abs(pitch));
-			travel.z -= velocity.z * amount_move_z * pitch;
+			travel.z -= velocity.y * amount_move_z * (1.0 - abs(pitch));
+			travel.z += velocity.z * amount_move_z * pitch;
 			if (debug) {
 				console.printf( "----------------" );
 				console.printf( "A: %f", angle );
@@ -64,7 +67,7 @@ class MotionBlurHandler : StaticEventHandler {
 		PlayerInfo	plr = players[consoleplayer];
 		if (plr) {
 			if (plr.health > 0 && Cvar.GetCVar("r_motionblur", plr).GetBool()) {
-				EventHandler.SendNetworkEvent("liveupdate");
+				EventHandler.SendNetworkEvent("updatemotionblur");
 				vector3 shift = travel;
 				if (shift.x == 0 && shift.y == 0 && shift.z == 0) {
 					Shader.SetEnabled(plr, "MotionBlur", false);
@@ -73,7 +76,7 @@ class MotionBlurHandler : StaticEventHandler {
 				else {
 					int samples = 1;
 					if (Cvar.GetCVar("r_motionblur_dynsamps", plr).GetBool())
-						samples += ceil(sqrt(shift.x * shift.x + shift.y * shift.y + shift.z * shift.z) * int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt()) * 10);
+						samples += ceil(sqrt(shift.x * shift.x + shift.y * shift.y + shift.z * shift.z) * int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt()) * 8);
 					else
 						samples += int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt());
 					
