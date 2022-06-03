@@ -11,9 +11,8 @@ OptionMenu "MotionBlur" {
 	Slider "Samples", "r_motionblur_samples", 1, 128, 1, 0, "r_motionblur"
 	Option "Dynamic", "r_motionblur_dynsamps", YesNo, "r_motionblur"
 	StaticText ""
-	Slider "Look Strength %", "r_motionblur_strength_look", 0, 100, 1, 0, "r_motionblur"
-	Slider "Move Strength %", "r_motionblur_strength_move", 0, 100, 1, 0, "r_motionblur"
-	Slider "Strafe Strength %", "r_motionblur_strength_strafe", 0, 100, 1, 0, "r_motionblur"
+	Slider "Look Strength %", "r_motionblur_strength_look", -100, 100, 1, 0, "r_motionblur"
+	Slider "Move Strength %", "r_motionblur_strength_move", -100, 100, 1, 0, "r_motionblur"
 }
 
 OptionValue "MotionBlurBlendModes" {

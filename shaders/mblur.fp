@@ -5,14 +5,14 @@ void main() {
 		//Normal
 		case 0:
 			for(int i = 0; i < samples; i++) {
-				stack += texture(InputTexture, 0.5 + ((TexCoord - 0.5) / (vec2(shift.z * i + 1))) + vec2(shift.x, shift.y * (texSize.x / texSize.y)) * i).rgb * (1.0 / samples);
+				stack += texture(InputTexture, 0.5 + ((TexCoord - 0.5) / (vec2(shift.z * 4 * i + 1))) + vec2(shift.x, shift.y * (texSize.x / texSize.y)) * i).rgb * (1.0 / samples);
 			}
 			break;
 			
 		//Lighten
 		case 1:
 			for(int i = 0; i < samples; i++) {
-				stack += max(stack, texture(InputTexture, 0.5 + ((TexCoord - 0.5) / (vec2(shift.z * i + 1))) + vec2(shift.x, shift.y * (texSize.x / texSize.y)) * i).rgb) * (1.0 / samples);
+				stack += max(stack, texture(InputTexture, 0.5 + ((TexCoord - 0.5) / (vec2(shift.z * 4 * i + 1))) + vec2(shift.x, shift.y * (texSize.x / texSize.y)) * i).rgb) * (1.0 / samples);
 			}
 			break;
 	}

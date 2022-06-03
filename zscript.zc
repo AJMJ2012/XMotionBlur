@@ -1,96 +1,105 @@
 version "2.4"
 
-// TODO: Somehow make it run faster than 35 frames per second.
+// TODO: Apply a trick Nash taught me to have it run faster than 35 frames per second.
+// TODO: Add roll support.
 
 class MotionBlurHandler : StaticEventHandler {
-	bool debug;
+	int debug;
 	vector3 travel;
 	vector2 view;
 	
-	override void PlayerEntered(PlayerEvent e) {
-		PlayerInfo plr = players[e.PlayerNumber];
-		if (plr) {
+	override void PlayerEntered(PlayerEvent event) {
+		PlayerInfo player = players[event.PlayerNumber];
+		if (player) {
 			travel = (0,0,0);
 		}
 	}
 	
 	override void WorldTick() {
-		PlayerInfo plr = players[consoleplayer];
-		if (plr && plr.health > 0 && Cvar.GetCVar("r_motionblur", plr).GetBool()) {
-			view.x = plr.mo.GetPlayerInput(ModInput_Yaw);
-			view.y = -plr.mo.GetPlayerInput(ModInput_Pitch);
+		PlayerInfo player = players[consoleplayer];
+		if (player && player.health > 0 && Cvar.GetCVar("r_motionblur", player).GetBool()) {
+			view.x = player.mo.GetPlayerInput(ModInput_Yaw);
+			view.y = -player.mo.GetPlayerInput(ModInput_Pitch);
 		}
 		else {
 			travel = (0,0,0);
 		}
 	}
 	
-	override void NetworkProcess(ConsoleEvent e) {
-		PlayerInfo plr = players[e.Player];
-		if (plr && e.Name == "updatemotionblur") {
+	override void NetworkProcess(ConsoleEvent event) {
+		PlayerInfo player = players[event.Player];
+		if (player && event.Name == "updatemotionblur") {
 			travel = (0,0,0);
-			double angle = atan2(plr.mo.vel.y, plr.mo.vel.x) - ((plr.mo.angle) % 360);
-			vector3 velocity = ((-sin(angle), cos(angle)) * sqrt(plr.mo.vel.x * plr.mo.vel.x + plr.mo.vel.y * plr.mo.vel.y), plr.mo.vel.z);
-			
-			double pitch = sin(plr.mo.pitch);
-			
+
 			// Shift pixels based on the distance travelled or turned from the previous frame.
-			double amount_look    = Cvar.GetCVar("r_motionblur_strength_look", plr).GetFloat()   / 100 / 25600;
-			// THESE BELOW NEED DEPTH BASED BLUR BUT THAT IS IMPOSSIBLE RIGHT NOW!
-			double amount_move_z  = Cvar.GetCVar("r_motionblur_strength_move", plr).GetFloat()   / 100 / 64; // Focal Distance
-			double amount_move_xy = Cvar.GetCVar("r_motionblur_strength_strafe", plr).GetFloat() / 100 / 512; // Focal Distance
+			double amount_look   = Cvar.GetCVar("r_motionblur_strength_look", player).GetFloat() / 100 / 25600;
+			// Depth based move blur would be nice but we can't have that in GZDoom.
+			double amount_move = Cvar.GetCVar("r_motionblur_strength_move", player).GetFloat() / 100 / 512;
 			
+			double xyspeed = sqrt(player.mo.vel.x * player.mo.vel.x + player.mo.vel.y * player.mo.vel.y);
+			double zspeed = player.mo.vel.z;
+
+			double angle = atan2(player.mo.vel.y, player.mo.vel.x) - player.mo.angle;
+			double pitch = player.mo.pitch;
+			double roll = player.mo.roll;
+
+			vector3 velocity = (1,1,1);
+			velocity.x = -sin(angle) * xyspeed;
+			velocity.y =  cos(angle) *  cos(pitch) * xyspeed + -sin(pitch) * zspeed;
+			velocity.z =  cos(angle) * -sin(pitch) * xyspeed +  cos(pitch) * zspeed;
+
 			// Looking Around
-			travel.x += view.x * amount_look * (1.0 - abs(pitch));
+			travel.x += view.x * amount_look;
 			travel.y += view.y * amount_look;
-			
-			// Moving Left/Right/Up/Down
-			travel.x -= velocity.x * amount_move_xy;
-			travel.y -= velocity.y * amount_move_xy * pitch;
-			travel.y -= velocity.z * amount_move_xy * (1.0 - abs(pitch));
-			
-			// Moving Forward/Back
-			travel.z -= velocity.y * amount_move_z * (1.0 - abs(pitch));
-			travel.z += velocity.z * amount_move_z * pitch;
-			if (debug) {
+
+			// Moving Left/Right
+			// Swap Y/Z velocities for screen coords
+			travel.x -= velocity.x * amount_move;
+			travel.y -= velocity.z * amount_move;
+			travel.z -= velocity.y * amount_move;
+
+			if (debug == 1) {
 				console.printf( "----------------" );
-				console.printf( "A: %f", angle );
-				console.printf( "P: %f", pitch );
-				console.printf( "X: %f", travel.x );
-				console.printf( "Y: %f", travel.y );
-				console.printf( "Z: %f", travel.z );
+				console.printf( "Relative X: %f", velocity.x );
+				console.printf( "Relative Y: %f", velocity.y );
+				console.printf( "Relative Z: %f", velocity.z );
 			}
 		}
 	}
 	
 	override void UiTick() {
-		PlayerInfo	plr = players[consoleplayer];
-		if (plr) {
-			if (plr.health > 0 && Cvar.GetCVar("r_motionblur", plr).GetBool()) {
+		PlayerInfo	player = players[consoleplayer];
+		if (player) {
+			if (player.health > 0 && Cvar.GetCVar("r_motionblur", player).GetBool()) {
 				EventHandler.SendNetworkEvent("updatemotionblur");
 				vector3 shift = travel;
 				if (shift.x == 0 && shift.y == 0 && shift.z == 0) {
-					Shader.SetEnabled(plr, "MotionBlur", false);
+					Shader.SetEnabled(player, "MotionBlur", false);
 					return;
 				}
 				else {
 					int samples = 1;
-					if (Cvar.GetCVar("r_motionblur_dynsamps", plr).GetBool())
-						samples += ceil(sqrt(shift.x * shift.x + shift.y * shift.y + shift.z * shift.z) * int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt()) * 8);
+					if (Cvar.GetCVar("r_motionblur_dynsamps", player).GetBool())
+						samples += min(1024, ceil(sqrt(shift.x * shift.x + shift.y * shift.y + shift.z * shift.z) * int(Cvar.GetCVar("r_motionblur_samples", player).GetInt()) * 8));
 					else
-						samples += int(Cvar.GetCVar("r_motionblur_samples", plr).GetInt());
+						samples += int(Cvar.GetCVar("r_motionblur_samples", player).GetInt());
 					
-					if (debug)
-						console.printf( "S: %f", samples );
+					if (debug == 2) {
+						console.printf( "----------------" );
+						console.printf( "Shift S: %f", samples );
+						console.printf( "Shift X: %f", shift.x );
+						console.printf( "Shift Y: %f", shift.y );
+						console.printf( "Shift Z: %f", shift.z );
+					}
 					
-					Shader.SetUniform3f(plr, "MotionBlur", "shift", shift / samples);
-					Shader.SetUniform1i(plr, "MotionBlur", "samples", samples);
-					Shader.SetUniform1i(plr, "MotionBlur", "blendMode", Cvar.GetCVar("r_motionblur_blendmode", plr).GetInt());
-					Shader.SetEnabled(plr, "MotionBlur", true);
+					Shader.SetUniform3f(player, "MotionBlur", "shift", shift / samples);
+					Shader.SetUniform1i(player, "MotionBlur", "samples", samples);
+					Shader.SetUniform1i(player, "MotionBlur", "blendMode", Cvar.GetCVar("r_motionblur_blendmode", player).GetInt());
+					Shader.SetEnabled(player, "MotionBlur", true);
 				}
 			}
 			else {
-				Shader.SetEnabled(plr, "MotionBlur", false);
+				Shader.SetEnabled(player, "MotionBlur", false);
 			}
 		}
 	}
